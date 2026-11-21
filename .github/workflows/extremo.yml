@@ -1,0 +1,35 @@
+# Prueba de extremo a extremo: levanta la API con gunicorn (como en producción), sirve el cliente
+# y lo recorre con Chrome (Playwright): login, CRUD, Open Library, 401 y Swagger. Guarda las capturas.
+name: Prueba de extremo a extremo
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt playwright
+      - name: API con gunicorn y cliente web
+        run: |
+          gunicorn app:app --workers 2 --bind 127.0.0.1:5000 --daemon --access-logfile gunicorn.log
+          nohup python -m http.server 8000 --bind 127.0.0.1 --directory cliente > /dev/null 2>&1 &
+          for i in $(seq 1 20); do curl -sf http://127.0.0.1:5000/api/libros > /dev/null && break; sleep 1; done
+          curl -s http://127.0.0.1:5000/
+      - name: Recorrer el cliente con Chrome
+        run: mkdir -p capturas && python scripts/prueba_cliente.py http://127.0.0.1:8000/ http://127.0.0.1:5000 capturas | tee capturas/resultado.txt
+      - name: Peticiones que recibió la API
+        if: always()
+        run: cp gunicorn.log capturas/ 2>/dev/null; tail -40 gunicorn.log || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: capturas-e2e
+          path: capturas/
