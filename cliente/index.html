@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BiblioServ · Cliente web</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📚</text></svg>">
+  <link rel="stylesheet" href="estilos.css">
+</head>
+<body>
+<div class="envoltura">
+  <header>
+    <div>
+      <h1>Biblio<span>Serv</span></h1>
+      <p class="sub">Cliente web que consume los servicios de la biblioteca escolar</p>
+    </div>
+    <div id="estado-api" class="estado">Conectando con la API…</div>
+  </header>
+
+  <!-- Servicio de autenticación -->
+  <section id="panel-login" class="panel">
+    <h2>Iniciar sesión</h2>
+    <p class="nota">La lista es pública. Para agregar, editar o borrar hace falta un token del servicio de autenticación.</p>
+    <form id="form-login" class="fila">
+      <label>Usuario <input id="usuario" value="bibliotecario" autocomplete="username"></label>
+      <label>Contraseña <input id="password" type="password" value="demo1234" autocomplete="current-password"></label>
+      <button type="submit">Iniciar sesión</button>
+    </form>
+    <p id="error-login" class="error"></p>
+  </section>
+  <section id="panel-sesion" class="panel oculto">
+    <div class="fila entre">
+      <span>Sesión iniciada como <b id="quien"></b> · token válido por 8 horas</span>
+      <button id="salir" class="secundario">Cerrar sesión</button>
+    </div>
+  </section>
+
+  <!-- Servicio de catálogo -->
+  <section class="panel">
+    <div class="fila entre">
+      <h2>Catálogo <small id="total"></small></h2>
+      <input id="buscar" type="search" placeholder="Buscar por título, autor o ISBN" aria-label="Buscar en el catálogo">
+    </div>
+    <table>
+      <thead><tr><th></th><th>Título</th><th>Autor</th><th>Año</th><th>Estado</th><th class="solo-sesion">Acciones</th></tr></thead>
+      <tbody id="tabla"></tbody>
+    </table>
+  </section>
+
+  <!-- Alta y edición, con ayuda del servicio externo -->
+  <section id="panel-form" class="panel solo-sesion">
+    <h2 id="titulo-form">Agregar libro</h2>
+    <div class="externo">
+      <h3>Buscar en Open Library <small>(servicio externo)</small></h3>
+      <form id="form-externo" class="fila">
+        <input id="q-externo" placeholder="Título o ISBN, por ejemplo «aura fuentes»" aria-label="Buscar en Open Library">
+        <button type="submit" class="secundario">Buscar</button>
+      </form>
+      <div id="resultados-externo"></div>
+    </div>
+    <form id="form-libro" class="rejilla">
+      <label>Título * <input id="f-titulo" required></label>
+      <label>Autor * <input id="f-autor" required></label>
+      <label>Año <input id="f-anio" type="number" min="1" max="2100"></label>
+      <label>ISBN <input id="f-isbn"></label>
+      <label class="ancho">Portada (URL) <input id="f-portada"></label>
+      <div class="ancho fila">
+        <button type="submit" id="guardar">Agregar libro</button>
+        <button type="button" id="cancelar" class="secundario oculto">Cancelar edición</button>
+      </div>
+    </form>
+  </section>
+
+  <footer>
+    <a id="enlace-docs" target="_blank" rel="noopener">Documentación de la API (Swagger)</a> ·
+    <a href="https://github.com/JazyelAe/BiblioServ-Servicios" target="_blank" rel="noopener">Repositorio</a>
+  </footer>
+</div>
+<div id="aviso" role="status"></div>
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
