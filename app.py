@@ -28,6 +28,8 @@ def crear_app(config=None):
     if config:
         app.config.update(config)
     app.url_map.strict_slashes = False  # /api/libros y /api/libros/ funcionan igual
+    app.json.ensure_ascii = False       # acentos legibles en el JSON ("Páramo", no "Páramo")
+    app.json.sort_keys = False          # los campos salen en el orden de la tabla
 
     # CORS: solo el cliente publicado en GitHub Pages (y el local) puede llamar a la API desde el navegador.
     CORS(app, origins=app.config["ORIGENES_CORS"])

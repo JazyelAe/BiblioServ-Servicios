@@ -130,6 +130,9 @@ with sync_playwright() as p:
     # --- La API vista directamente: JSON y Swagger ---
     pj = ctx.new_page()
     pj.goto(API + "/api/libros", wait_until="load")
+    # Casilla «Impresión con formato estilístico» del visor JSON de Chrome (está en un shadow DOM cerrado,
+    # por eso se pulsa por su posición en la esquina superior izquierda).
+    pj.mouse.click(246, 10)
     pj.wait_for_timeout(500)
     pj.screenshot(path=os.path.join(SALIDA, "07_json_libros.png"))
     pj.goto(API + "/docs", wait_until="networkidle")
