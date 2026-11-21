@@ -1,0 +1,17 @@
+# Blueprint de Render: publica la API (servicios de autenticación, catálogo y externo) en el plan gratuito.
+# En Render: New → Blueprint → elegir este repositorio → Deploy Blueprint.
+services:
+  - type: web
+    name: biblioserv
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --workers 2 --bind 0.0.0.0:$PORT
+    healthCheckPath: /api/libros
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.8"
+      - key: SECRET_KEY
+        generateValue: true   # Render crea una clave aleatoria; no se guarda en el repositorio
+      - key: ORIGENES_CORS
+        value: https://jazyelae.github.io,http://localhost:8000,http://127.0.0.1:8000
