@@ -4,3 +4,4 @@ __pycache__/
 biblioteca.db
 .venv/
 .env
+_e2e/

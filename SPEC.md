@@ -2,8 +2,8 @@
 
 **Materia:** Aplicaciones Web Progresivas · Unidad I · Actividad Desarrollo
 **Alumno:** Jahir Jaziel Serrano Arana · 10° D
-**Repositorio:** `JazyelAe/service` → se propone renombrarlo a **`JazyelAe/BiblioServ-Servicios`** (requiere tu confirmación)
-**Estado:** borrador para aprobación (Checkpoint A)
+**Repositorio:** `JazyelAe/BiblioServ-Servicios` (antes `JazyelAe/service`; renombrado con tu aprobación)
+**Estado:** aprobado el 20/11/2026 · implementado · cliente en Pages · API sin hosting público (decisión: sin Render)
 
 ## 1. Objetivo
 Convertir BiblioServ en una aplicación formada por **servicios independientes que se comunican por HTTP/JSON**:
@@ -108,4 +108,17 @@ Hoy el repo tiene solo `app.py` (93 líneas), `index.html` y `requirements.txt` 
 | Google Maps Platform | Servicios de mapas, rutas y lugares consumidos mediante API | developers.google.com/maps |
 
 ## 10. Pruebas
-_(Se llena después de implementar.)_
+| # | Resultado | Evidencia |
+|---|---|---|
+| CA-1 | ✅ `GET /api/libros` responde JSON sin token (200, 5 libros). **No hay URL pública**: se decidió no usar Render; la API corre en local y en GitHub Actions con gunicorn. | `07_json_libros.png` |
+| CA-2 | ✅ `POST` sin token → 401; `DELETE` con token falso → 401; el cliente con un token falsificado recibe 401 y pide iniciar sesión. | `06_sin_token_401.png`, pytest |
+| CA-3 | ✅ El **cliente publicado en Pages** hizo alta, edición, préstamo y borrado contra la API local (15/15). Lo mismo con gunicorn en Actions (15/15). | `pruebas_cliente_pages.txt`, `pruebas_e2e_actions.txt`, `03`, `05`, `11_registro_peticiones.png` |
+| CA-4 | ✅ La búsqueda «aura carlos fuentes» en Open Library devolvió 5 resultados y «Usar estos datos» precargó el formulario. | `04_busqueda_openlibrary.png` |
+| CA-5 | ✅ `pytest`: 14/14 en la PC y en Actions. | Actions |
+| CA-6 | ✅ Swagger UI en `/docs` muestra los 8 endpoints. | `08_swagger.png` |
+| CA-7 | ✅ README con diagrama (Mermaid), tabla de endpoints, instrucciones y enlaces. | README.md |
+
+**Incidencias y decisiones:**
+- **Sin Render (tu decisión):** el cliente de Pages se conecta a `http://127.0.0.1:5000`. Chrome pide el permiso de **«red local»** cuando un sitio público llama a la computadora; con ese permiso funciona (verificado).
+- **CORS:** solo cubría `/api/*`, y el cliente no podía comprobar `GET /`. Se aplicó a toda la API, limitado a los mismos orígenes.
+- **JSON:** salía con acentos escapados (`Páramo`); se configuró UTF-8 legible.

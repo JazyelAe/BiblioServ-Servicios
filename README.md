@@ -8,8 +8,8 @@ un servicio de **autenticación**, un servicio de **catálogo** (API REST + SQLi
 | | Enlace |
 |---|---|
 | 🌐 Cliente web (GitHub Pages) | **https://jazyelae.github.io/BiblioServ-Servicios/** |
-| ⚙️ API (Render) | **https://biblioserv.onrender.com** |
-| 📖 Documentación (Swagger) | https://biblioserv.onrender.com/docs |
+| ⚙️ API | Se ejecuta en tu computadora con `python app.py` → http://127.0.0.1:5000 (no está publicada en Internet; ver [Despliegue](#despliegue)) |
+| 📖 Documentación (Swagger) | http://127.0.0.1:5000/docs (con la API corriendo) |
 
 Usuario de demostración: **bibliotecario** / **demo1234**.
 
@@ -53,10 +53,10 @@ El token se envía en el encabezado `Authorization: Bearer <token>`. La especifi
 
 ### Ejemplo con curl
 ```bash
-curl https://biblioserv.onrender.com/api/libros
-TOKEN=$(curl -s -X POST https://biblioserv.onrender.com/api/login -H "Content-Type: application/json" \
+curl http://127.0.0.1:5000/api/libros
+TOKEN=$(curl -s -X POST http://127.0.0.1:5000/api/login -H "Content-Type: application/json" \
   -d '{"usuario":"bibliotecario","password":"demo1234"}' | python -c "import json,sys;print(json.load(sys.stdin)['token'])")
-curl -X POST https://biblioserv.onrender.com/api/libros -H "Authorization: Bearer $TOKEN" \
+curl -X POST http://127.0.0.1:5000/api/libros -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" -d '{"titulo":"Aura","autor":"Carlos Fuentes","anio":1962}'
 ```
 
@@ -67,15 +67,21 @@ pip install -r requirements-dev.txt
 pytest -v                                           # 14 pruebas de los servicios
 python app.py                                       # API en http://127.0.0.1:5000
 python -m http.server 8000 --directory cliente      # cliente en http://127.0.0.1:8000
+                                                    # (o usa el de Pages, con la API corriendo)
 ```
 
 ## Despliegue
-- **API → Render** con [`render.yaml`](render.yaml) (Blueprint): `gunicorn app:app`; `SECRET_KEY` la genera Render.
-  - Limitaciones del **plan gratuito**:
-    - El servicio **se duerme tras 15 minutos** sin uso y la primera petición tarda cerca de 1 minuto (el cliente muestra «Despertando el servicio…»).
-    - El disco es temporal: al reiniciar o dormirse, la base **vuelve a los 5 libros de ejemplo**.
 - **Cliente → GitHub Pages** con `.github/workflows/pages.yml` (publica solo `cliente/`).
-- **Pruebas** con `.github/workflows/pruebas.yml` en cada push.
+  - Por defecto se conecta a la API local `http://127.0.0.1:5000`. Para usar otra API, agrega `?api=URL` a la dirección.
+  - Chrome pide permiso de **«red local»** la primera vez que un sitio público (Pages) llama a `127.0.0.1`: hay que **permitirlo**.
+  - Si la API no está corriendo, el cliente muestra cómo ejecutarla.
+- **API:** no se publicó en un hosting. Para probarla:
+  1. `python app.py` en tu computadora, o
+  2. el workflow **Prueba de extremo a extremo** (`.github/workflows/extremo.yml`), que en cada push la levanta con **gunicorn** (el servidor de producción) en Linux y recorre el cliente con Chrome.
+- **Opcional: Render.** El repo incluye [`render.yaml`](render.yaml) por si en el futuro se publica en Render (*New → Blueprint*). Limitaciones del plan gratuito:
+  - el servicio se duerme tras 15 minutos sin uso;
+  - la base SQLite vuelve a los 5 libros de ejemplo al reiniciar.
+- **Pruebas:** `.github/workflows/pruebas.yml` corre pytest en cada push.
 
 ## Configuración (variables de entorno)
 | Variable | Uso | Valor por defecto (solo desarrollo) |
@@ -92,4 +98,4 @@ python -m http.server 8000 --directory cliente      # cliente en http://127.0.0.
 | ![](capturas/04_busqueda_openlibrary.png) | ![](capturas/07_json_libros.png) |
 
 ## Tecnologías
-Python 3.12 · Flask 3.1 · SQLite · itsdangerous · flask-cors · requests · gunicorn · pytest · Open Library API · HTML/CSS/JS · Render · GitHub Pages.
+Python 3.12 · Flask 3.1 · SQLite · itsdangerous · flask-cors · requests · gunicorn · pytest · Open Library API · HTML/CSS/JS · GitHub Pages · GitHub Actions.
