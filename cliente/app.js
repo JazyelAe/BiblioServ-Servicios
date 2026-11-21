@@ -9,13 +9,13 @@ let titulos = {};                               // id → título, para confirma
 // Escapa el texto antes de ponerlo en HTML (los datos vienen de una API pública).
 const seguro = (t) => String(t ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
-function avisar(texto, error = false) {
+function avisar(texto, error = false, milisegundos = 3000) {
   const aviso = $("#aviso");
   aviso.textContent = texto;
   aviso.className = error ? "mal" : "";
   aviso.style.display = "block";
   clearTimeout(avisar.t);
-  avisar.t = setTimeout(() => (aviso.style.display = "none"), 3000);
+  avisar.t = setTimeout(() => (aviso.style.display = "none"), milisegundos);
 }
 
 // Llamada genérica a la API. Agrega el token y convierte los errores en mensajes.
@@ -187,15 +187,17 @@ function usarExterno(i) {
 // ---------- Inicio ----------
 async function comprobarApi() {
   const estado = $("#estado-api");
-  // Render duerme el servicio gratuito tras 15 min sin uso: la primera respuesta puede tardar ~1 minuto.
-  const lento = setTimeout(() => (estado.textContent = "Despertando el servicio (puede tardar un minuto)…"), 3000);
+  const lento = setTimeout(() => (estado.textContent = "La API tarda en responder…"), 3000);
   try {
     const r = await fetch(API + "/");
     estado.textContent = r.ok ? "API en línea" : "La API respondió " + r.status;
     estado.className = "estado " + (r.ok ? "ok" : "mal");
+    return r.ok;
   } catch {
     estado.textContent = "Sin conexión con la API";
     estado.className = "estado mal";
+    avisar(`No se pudo conectar con ${API}. Ejecuta la API con «python app.py» (instrucciones en el README).`, true, 20000);
+    return false;
   } finally {
     clearTimeout(lento);
   }
@@ -204,4 +206,4 @@ async function comprobarApi() {
 $("#enlace-docs").href = API + "/docs";
 mostrarSesion();
 if (token) api("/api/perfil").then((p) => mostrarSesion(p.usuario)).catch((err) => avisar(err.message, true));
-comprobarApi().then(cargarLibros);
+comprobarApi().then((enLinea) => enLinea && cargarLibros());
