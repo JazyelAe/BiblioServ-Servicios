@@ -1,0 +1,168 @@
+openapi: 3.0.3
+info:
+  title: BiblioServ API
+  version: 1.0.0
+  description: |
+    API REST de una biblioteca escolar, formada por tres servicios que se comunican por HTTP/JSON:
+    **autenticación** (tokens firmados), **catálogo** (CRUD de libros en SQLite) y **externo**
+    (consulta a la API pública de Open Library).
+
+    Usuario de demostración: `bibliotecario` / `demo1234`. Para probar las rutas protegidas:
+    1) ejecuta `POST /api/login`, 2) copia el token, 3) pulsa **Authorize** y pégalo.
+servers:
+  - url: /
+tags:
+  - name: Autenticación
+  - name: Catálogo
+  - name: Externo (Open Library)
+components:
+  securitySchemes:
+    token:
+      type: http
+      scheme: bearer
+  schemas:
+    Libro:
+      type: object
+      properties:
+        id: { type: integer, example: 3 }
+        titulo: { type: string, example: Pedro Páramo }
+        autor: { type: string, example: Juan Rulfo }
+        anio: { type: integer, nullable: true, example: 1955 }
+        isbn: { type: string, example: "9780802133908" }
+        portada: { type: string, example: "https://covers.openlibrary.org/b/id/123-M.jpg" }
+        disponible: { type: boolean, example: true }
+    LibroNuevo:
+      type: object
+      required: [titulo, autor]
+      properties:
+        titulo: { type: string, example: Aura }
+        autor: { type: string, example: Carlos Fuentes }
+        anio: { type: integer, example: 1962 }
+        isbn: { type: string, example: "9789681900135" }
+        portada: { type: string }
+        disponible: { type: boolean, example: true }
+    Error:
+      type: object
+      properties:
+        error: { type: string, example: Falta el token o no es válido }
+  responses:
+    SinToken:
+      description: Falta el token o no es válido (o caducó)
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+    NoExiste:
+      description: No existe ese libro
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+  parameters:
+    id:
+      name: id
+      in: path
+      required: true
+      schema: { type: integer }
+paths:
+  /api/login:
+    post:
+      tags: [Autenticación]
+      summary: Iniciar sesión y obtener un token (válido 8 horas)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                usuario: { type: string, example: bibliotecario }
+                password: { type: string, example: demo1234 }
+      responses:
+        "200":
+          description: Token firmado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  usuario: { type: string }
+                  token: { type: string }
+                  expira_en_horas: { type: integer, example: 8 }
+        "401":
+          description: Usuario o contraseña incorrectos
+  /api/perfil:
+    get:
+      tags: [Autenticación]
+      summary: Datos del usuario del token
+      security: [{ token: [] }]
+      responses:
+        "200": { description: Usuario y rol }
+        "401": { $ref: "#/components/responses/SinToken" }
+  /api/libros:
+    get:
+      tags: [Catálogo]
+      summary: Listar libros (público). Busca en título, autor o ISBN con ?q=
+      parameters:
+        - { name: q, in: query, schema: { type: string }, example: rulfo }
+      responses:
+        "200":
+          description: Lista de libros
+          content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Libro" } } } }
+    post:
+      tags: [Catálogo]
+      summary: Dar de alta un libro
+      security: [{ token: [] }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/LibroNuevo" } } }
+      responses:
+        "201":
+          description: Libro creado
+          content: { application/json: { schema: { $ref: "#/components/schemas/Libro" } } }
+        "400": { description: Datos inválidos (por ejemplo, falta el título) }
+        "401": { $ref: "#/components/responses/SinToken" }
+  /api/libros/{id}:
+    parameters: [{ $ref: "#/components/parameters/id" }]
+    get:
+      tags: [Catálogo]
+      summary: Consultar un libro (público)
+      responses:
+        "200":
+          description: El libro
+          content: { application/json: { schema: { $ref: "#/components/schemas/Libro" } } }
+        "404": { $ref: "#/components/responses/NoExiste" }
+    put:
+      tags: [Catálogo]
+      summary: Editar un libro (se pueden mandar solo algunos campos, por ejemplo disponible)
+      security: [{ token: [] }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/LibroNuevo" } } }
+      responses:
+        "200":
+          description: Libro actualizado
+          content: { application/json: { schema: { $ref: "#/components/schemas/Libro" } } }
+        "400": { description: Datos inválidos }
+        "401": { $ref: "#/components/responses/SinToken" }
+        "404": { $ref: "#/components/responses/NoExiste" }
+    delete:
+      tags: [Catálogo]
+      summary: Borrar un libro
+      security: [{ token: [] }]
+      responses:
+        "204": { description: Borrado }
+        "401": { $ref: "#/components/responses/SinToken" }
+        "404": { $ref: "#/components/responses/NoExiste" }
+  /api/externo/buscar:
+    get:
+      tags: [Externo (Open Library)]
+      summary: Buscar un libro por título o ISBN en Open Library (servicio externo)
+      parameters:
+        - { name: q, in: query, required: true, schema: { type: string }, example: pedro paramo }
+      responses:
+        "200":
+          description: Hasta 5 resultados ya simplificados
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  fuente: { type: string, example: Open Library }
+                  resultados: { type: array, items: { $ref: "#/components/schemas/LibroNuevo" } }
+        "400": { description: Falta el texto de búsqueda }
+        "502": { description: Open Library no respondió }

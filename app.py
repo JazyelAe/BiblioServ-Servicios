@@ -1,93 +1,77 @@
-"""BiblioServ - Servicio REST para administrar libros de una biblioteca escolar."""
-import secrets, sqlite3
-from functools import wraps
-from flask import Flask, g, jsonify, request, send_from_directory
+"""BiblioServ · aplicación orientada a servicios.
+Une los servicios (autenticación, catálogo y consumo de Open Library) en una sola API Flask.
+Local:      python app.py          → http://127.0.0.1:5000
+Producción: gunicorn app:app       (Render, ver render.yaml)"""
+import os
+from flask import Flask, jsonify, send_from_directory
+from flask_cors import CORS
 
-app = Flask(__name__, static_folder="static")
-DB = "biblioteca.db"
-USUARIOS = {"bibliotecario": "demo1234"}
-TOKENS = {}
+import basedatos
+from autenticacion import autenticacion
+from catalogo import catalogo
+from externo import externo
 
-def db():
-    if "db" not in g:
-        g.db = sqlite3.connect(DB)
-        g.db.row_factory = sqlite3.Row
-    return g.db
+CARPETA = os.path.dirname(os.path.abspath(__file__))
 
-@app.teardown_appcontext
-def cerrar(_):
-    d = g.pop("db", None)
-    if d: d.close()
 
-def init_db():
-    c = sqlite3.connect(DB)
-    c.execute("""CREATE TABLE IF NOT EXISTS libros(
-        id INTEGER PRIMARY KEY AUTOINCREMENT, titulo TEXT NOT NULL,
-        autor TEXT NOT NULL, disponible INTEGER NOT NULL DEFAULT 1)""")
-    if c.execute("SELECT COUNT(*) FROM libros").fetchone()[0] == 0:
-        c.executemany("INSERT INTO libros(titulo, autor, disponible) VALUES (?,?,?)", [
-            ("Cien años de soledad", "Gabriel García Márquez", 1),
-            ("El laberinto de la soledad", "Octavio Paz", 1),
-            ("Pedro Páramo", "Juan Rulfo", 0),
-            ("Como agua para chocolate", "Laura Esquivel", 1),
-            ("La muerte de Artemio Cruz", "Carlos Fuentes", 1)])
-        c.commit()
-    c.close()
+def crear_app(config=None):
+    app = Flask(__name__)
+    app.config.update(
+        # En Render, SECRET_KEY la genera la plataforma (render.yaml). El valor por defecto es solo para desarrollo.
+        SECRET_KEY=os.environ.get("SECRET_KEY", "solo-para-desarrollo"),
+        DEMO_PASSWORD=os.environ.get("DEMO_PASSWORD", "demo1234"),
+        DATABASE=os.environ.get("BIBLIO_DB", os.path.join(CARPETA, "biblioteca.db")),
+        TOKEN_SEGUNDOS=8 * 3600,
+        ORIGENES_CORS=os.environ.get(
+            "ORIGENES_CORS", "https://jazyelae.github.io,http://localhost:8000,http://127.0.0.1:8000").split(","),
+    )
+    if config:
+        app.config.update(config)
+    app.url_map.strict_slashes = False  # /api/libros y /api/libros/ funcionan igual
 
-def requiere_token(f):
-    @wraps(f)
-    def w(*a, **k):
-        t = request.headers.get("Authorization", "").replace("Token ", "")
-        if t not in TOKENS:
-            return jsonify(error="Token inválido o ausente"), 401
-        g.usuario = TOKENS[t]
-        return f(*a, **k)
-    return w
+    # CORS: solo el cliente publicado en GitHub Pages (y el local) puede llamar a la API desde el navegador.
+    CORS(app, origins=app.config["ORIGENES_CORS"])
 
-@app.post("/api/login/")
-def login():
-    d = request.get_json(force=True)
-    if USUARIOS.get(d.get("usuario")) != d.get("password"):
-        return jsonify(error="Credenciales incorrectas"), 400
-    t = secrets.token_hex(16); TOKENS[t] = d["usuario"]
-    return jsonify(usuario=d["usuario"], token=t)
+    basedatos.inicializar(app.config["DATABASE"])
+    app.teardown_appcontext(basedatos.cerrar)
+    for servicio in (autenticacion, catalogo, externo):
+        app.register_blueprint(servicio)
 
-@app.get("/api/perfil/")
-@requiere_token
-def perfil():
-    return jsonify(usuario=g.usuario, rol="Bibliotecario")
+    @app.get("/")
+    def inicio():
+        return jsonify(
+            servicio="BiblioServ",
+            descripcion="API REST de una biblioteca escolar orientada a servicios",
+            documentacion="/docs",
+            servicios={
+                "autenticacion": ["POST /api/login", "GET /api/perfil"],
+                "catalogo": ["GET /api/libros", "GET /api/libros/<id>", "POST /api/libros",
+                             "PUT /api/libros/<id>", "DELETE /api/libros/<id>"],
+                "externo": ["GET /api/externo/buscar?q="],
+            },
+        )
 
-@app.get("/api/libros/")
-@requiere_token
-def listar():
-    return jsonify([dict(r) for r in db().execute("SELECT * FROM libros ORDER BY id")])
+    # Documentación de la API: Swagger UI lee openapi.yaml
+    @app.get("/docs")
+    def docs():
+        return send_from_directory(os.path.join(CARPETA, "docs"), "swagger.html")
 
-@app.post("/api/libros/")
-@requiere_token
-def crear():
-    d = request.get_json(force=True)
-    cur = db().execute("INSERT INTO libros(titulo, autor) VALUES (?,?)", (d["titulo"], d["autor"]))
-    db().commit()
-    return jsonify(id=cur.lastrowid, titulo=d["titulo"], autor=d["autor"], disponible=1), 201
+    @app.get("/openapi.yaml")
+    def openapi():
+        return send_from_directory(os.path.join(CARPETA, "docs"), "openapi.yaml", mimetype="text/yaml")
 
-@app.put("/api/libros/<int:i>/")
-@requiere_token
-def actualizar(i):
-    d = request.get_json(force=True)
-    db().execute("UPDATE libros SET disponible=? WHERE id=?", (1 if d.get("disponible") else 0, i))
-    db().commit()
-    return jsonify(id=i, disponible=1 if d.get("disponible") else 0)
+    @app.errorhandler(404)
+    def no_encontrado(_):
+        return jsonify(error="Ruta no encontrada"), 404
 
-@app.delete("/api/libros/<int:i>/")
-@requiere_token
-def borrar(i):
-    db().execute("DELETE FROM libros WHERE id=?", (i,)); db().commit()
-    return "", 204
+    @app.errorhandler(405)
+    def metodo_no_permitido(_):
+        return jsonify(error="Método no permitido en esta ruta"), 405
 
-@app.get("/")
-def home():
-    return send_from_directory("static", "index.html")
+    return app
+
+
+app = crear_app()
 
 if __name__ == "__main__":
-    init_db()
-    app.run(port=5000)
+    app.run(port=5000, debug=False)

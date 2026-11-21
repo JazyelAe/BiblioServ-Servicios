@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BiblioServ · Documentación de la API</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.17.14/swagger-ui.css">
+</head>
+<body>
+  <!-- Swagger UI lee openapi.yaml y genera la documentación interactiva de todos los endpoints -->
+  <div id="swagger"></div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.17.14/swagger-ui-bundle.js"></script>
+  <script>
+    SwaggerUIBundle({ url: "openapi.yaml", dom_id: "#swagger", docExpansion: "list", defaultModelsExpandDepth: 0 });
+  </script>
+</body>
+</html>
